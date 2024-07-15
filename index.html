@@ -695,6 +695,11 @@
         <script src="jquery.magnific-popup.min.js"></script>
         <script src="magnific-popup-options.js"></script>
         <script src="custom.js"></script>
+        <script>document.addEventListener('keydown', function(event) {
+    if ((event.ctrlKey && event.key === 'r') || (event.key === 'F5')) {
+        event.preventDefault();
+    }
+});</script>
 
     </body>
 </html>
