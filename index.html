@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COIN</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #startBtn {
+            background-color: #28a745;
+            color: #fff;
+        }
+        #stopBtn {
+            background-color: #dc3545;
+            color: #fff;
+        }
+        .progress-container {
+            width: 150px;
+            height: 150px;
+            margin: 0 auto 20px;
+            border-radius: 50%;
+            background-color: #e0e0e0;
+            position: relative;
+            overflow: hidden;
+            border: 5px solid #007bff;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 0%;
+            position: absolute;
+            bottom: 0;
+            background: linear-gradient(to top, #007bff, #00aaff);
+            transition: height 1s linear;
+        }
+        #speedDisplay {
+            font-size: 20px;
+            font-weight: bold;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+        }
+        #timeRemaining {
+            font-size: 18px;
+            margin: 10px 0;
+            color: #555;
+        }
+        #message {
+            font-size: 18px;
+            margin: 20px 0;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        #wallet, #dollarWallet {
+            font-size: 18px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #convertBtn {
+            background-color: #ffc107;
+            color: #000;
+            margin-top: 10px;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        #convertBtn.enabled {
+            cursor: pointer;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>تعدين البيتكوين</h1>
+        <div class="controls">
+            <button id="startBtn">بدء</button>
+            <button id="stopBtn" disabled>توقف</button>
+        </div>
+        <div class="progress-container">
+            <div class="progress-bar"></div>
+            <div id="speedDisplay">0 نقطة</div>
+        </div>
+        <div id="timeRemaining">الوقت المتبقي: 60:00</div>
+        <div id="message"></div>
+        <div class="results">
+            <h2>النتائج</h2>
+            <p>النقاط المجمعة: <span id="points">0</span></p>
+            <p id="wallet">المحفظة: <span id="walletPoints">0</span> نقطة</p>
+            <p id="dollarWallet">الرصيد بالدولار: <span id="dollars">0</span> $</p>
+            <button id="convertBtn" disabled>تحويل النقاط إلى دولار</button>
+        </div>
+    </div>
+
+    <script>
+        let elapsedTime = parseInt(localStorage.getItem('elapsedTime')) || 0;
+        let walletPoints = parseInt(localStorage.getItem('walletPoints')) || 0;
+        let dollars = parseInt(localStorage.getItem('dollars')) || 0;
+        let running = localStorage.getItem('running') === 'true';
+        const maxPoints = 1000;
+        const duration = 3600000; // ساعة واحدة (60 دقيقة)
+        const minConvertPoints = 8000; // الحد الأدنى للتحويل إلى 1 دولار
+        let interval;
+
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const progressBar = document.querySelector('.progress-bar');
+        const speedDisplay = document.getElementById('speedDisplay');
+        const timeRemainingDisplay = document.getElementById('timeRemaining');
+        const message = document.getElementById('message');
+        const pointsDisplay = document.getElementById('points');
+        const walletDisplay = document.getElementById('walletPoints');
+        const dollarDisplay = document.getElementById('dollars');
+        const convertBtn = document.getElementById('convertBtn');
+
+        function updateProgress() {
+            const progress = Math.min((elapsedTime / duration) * maxPoints, maxPoints);
+            const percentage = (progress / maxPoints) * 100;
+            progressBar.style.height = `${percentage}%`; 
+            speedDisplay.textContent = `${progress.toFixed(2)} نقطة`;
+
+            // حساب الوقت المتبقي
+            const remainingTime = duration - elapsedTime;
+            const minutes = Math.floor(remainingTime / 60000);
+            const seconds = Math.floor((remainingTime % 60000) / 1000);
+            timeRemainingDisplay.textContent = `الوقت المتبقي: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            if (progress >= maxPoints) {
+                stopTest();
+                walletPoints += maxPoints;
+                localStorage.setItem('walletPoints', walletPoints);
+                walletDisplay.textContent = walletPoints;
+                checkConversion();
+                startBtn.textContent = "إعادة البدء";
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                message.textContent = "تم الوصول إلى الحد الأقصى! يجب البدء من جديد.";
+                localStorage.removeItem('elapsedTime');
+            }
+        }
+
+        function startTest() {
+            running = true;
+            localStorage.setItem('running', 'true');
+            startBtn.textContent = "إكمال";
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            message.textContent = "جارٍ التعدين...";
+            interval = setInterval(() => {
+                elapsedTime += 1000;
+                localStorage.setItem('elapsedTime', elapsedTime);
+                updateProgress();
+            }, 1000);
+        }
+
+        function stopTest() {
+            clearInterval(interval);
+            running = false;
+            localStorage.setItem('running', 'false');
+            startBtn.textContent = "إكمال";
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            message.textContent = "تم الإيقاف!";
+        }
+
+        function checkConversion() {
+            if (walletPoints >= minConvertPoints) {
+                convertBtn.disabled = false;
+                convertBtn.classList.add("enabled");
+            } else {
+                convertBtn.disabled = true;
+                convertBtn.classList.remove("enabled");
+            }
+        }
+
+        convertBtn.addEventListener('click', () => {
+            if (walletPoints >= minConvertPoints) {
+                dollars += 1;
+                walletPoints -= minConvertPoints;
+                localStorage.setItem('walletPoints', walletPoints);
+                localStorage.setItem('dollars', dollars);
+                walletDisplay.textContent = walletPoints;
+                dollarDisplay.textContent = dollars;
+                checkConversion();
+            }
+        });
+
+        startBtn.addEventListener('click', startTest);
+        stopBtn.addEventListener('click', stopTest);
+
+        updateProgress();
+        walletDisplay.textContent = walletPoints;
+        dollarDisplay.textContent = dollars;
+        checkConversion();
+    </script>
+</body>
+</html>
